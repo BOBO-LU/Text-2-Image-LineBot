@@ -8,5 +8,5 @@
 
 ## Reference:
 [1] [CLIP model](https://github.com/openai/CLIP)
-
 [2] [Natural language image search & preprocessed features](https://github.com/haltakov/natural-language-image-search)
+[3] [Line messaging API](https://developers.line.biz/en/docs/messaging-api/)
