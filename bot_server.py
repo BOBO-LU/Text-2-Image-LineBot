@@ -1,32 +1,23 @@
 
-from __future__ import unicode_literals
-from operator import ge
-import os
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageSendMessage, QuickReply, QuickReplyButton, MessageAction
-from routing import route_to_clip, get_unsplash_redirect
-import json
 import configparser
 import random
-from utils import dictConfig
+from clip_py import clip_class
 
 app = Flask(__name__)
 
-# LINE 聊天機器人的基本資料
+# 讀取設定
 config = configparser.ConfigParser()
 config.read('config.ini')
 
 line_bot_api = LineBotApi(config['LINE']['channel_access_token'])
 handler = WebhookHandler(config['LINE']['channel_secret'])
-clip_address = f"http://{config['ENV']['CLIP_HOST']}:{config['ENV']['CLIP_PORT']}/clip"
 
-
-@app.route("/", methods=['GET'])
-def get():
-    clip_response = route_to_clip("I am bobo", clip_address)
-    return clip_response
+# 實體化模型
+clip_model = clip_class()
 
 
 # 接收 LINE 的資訊
@@ -39,10 +30,10 @@ def callback():
     
     try:
         handler.handle(body, signature)
-        app.logger.info('callback success!')
+        app.logger.info('Callback success!')
     except InvalidSignatureError:
         abort(400)
-        app.logger.info('callback failed!')
+        app.logger.info('Callback failed, InvalidSignatureError!')
     
     return 'OK'
 
@@ -70,9 +61,9 @@ def msg_handler(event):
     
     
     else:
-
         text = str.lower(event.message.text)
 
+        # 特定情況
         if text == "hi":
             example_input_list = ['I feel so happy because I have a great dinner.','Feeling anxious due to the unfinished homework.', 'The feeling when I get the offer.', 'The feeling when you are writing thesis.' ]
             random_example_input = random.choice(example_input_list)
@@ -106,7 +97,7 @@ def msg_handler(event):
                     )
             
         elif text == "about me" or text == "jonathan" or text=="bobo":
-            message = TextSendMessage(text="I am Jonathan Lu, you can call me BOBO. I am seeking for data related internship.\n\n My resume: https://reurl.cc/e38lMR")
+            message = TextSendMessage(text="I am Jonathan Lu, you can call me BOBO. I am seeking for data related internship.\n\n My resume:\nhttps://reurl.cc/e38lMR")
 
         elif text == "github":
             message = TextSendMessage(text='https://github.com/BOBO-LU')
@@ -118,15 +109,12 @@ def msg_handler(event):
             help_text = "This bot aims to find the best image which can express your words, just type your feeling in English and let the bot finish the rest of the work.\n\nType 'Hi' to show quick reply prompts."
             message = TextSendMessage(text=help_text)
 
-
+        # 將訊息轉成照片網址
         else:
-
-            # 將訊息轉成照片網址
             max_img_cnt = 1
-            clip_response_str = route_to_clip(event.message.text, max_img_cnt, clip_address)
-            clip_response = json.loads(clip_response_str)
+            img_list = clip_model.search_unslash(event.message.text, max_img_cnt)
 
-            for img_url in clip_response['img_list']:
+            for img_url in img_list:
                 original = get_unsplash_redirect(img_url+"/640x640")
                 preview = get_unsplash_redirect(img_url+"/160x160")
 
@@ -135,12 +123,12 @@ def msg_handler(event):
                     preview_image_url=preview
                 )
 
-        # replay message 
+        # 回傳訊息
         line_bot_api.reply_message(
             event.reply_token,
             message
         )
+
+        
 if __name__ == "__main__":
     app.run(host=config['ENV']['HOST'], port=config['ENV']['PORT'])
-    # from waitress import serve
-    # serve(app, host=config['ENV']['HOST'], port=config['ENV']['PORT'])
